@@ -404,6 +404,11 @@ footer a:hover{color:#fff}
 </div>
 
 <script>
+/* ── backend config ──────────────────────────
+   Paste your Google Apps Script web app  between the quotes.
+   Orders will be appended to your Google Sheet. */
+const SCRIPT_URL = "AKfycbxaoPjxgQx4UNaoJZLf-7vwmn1hTjBm47gHs2B3wzEO_txeRMuV2EQOudd9bzcl4n7N";
+
 /* ── design data ─────────────────────────────
    Each sketch is a simple fashion-illustration SVG.
    Replace `sketch` with an <img> tag later if you add photos. */
@@ -530,6 +535,16 @@ form.addEventListener("submit", e=>{
   const data = Object.fromEntries(new FormData(form).entries());
   const u = data.units;
   const orderNo = "NT-" + Date.now().toString().slice(-6);
+
+  /* send order to Google Sheet (fire-and-forget) */
+  if (SCRIPT_URL && !SCRIPT_URL.startsWith("PASTE")) {
+    fetch(SCRIPT_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ orderNo, design: current.name, ...data })
+    }).catch(err => console.error("Order sync failed:", err));
+  }
   const rows = [
     ["Order no.", orderNo],
     ["Design", current.name],
