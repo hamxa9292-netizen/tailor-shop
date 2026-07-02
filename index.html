@@ -101,6 +101,7 @@ nav a:hover,nav a:focus-visible{border-bottom-color:var(--thread)}
 .card:hover{transform:translateY(-6px);box-shadow:0 18px 40px -18px rgba(43,36,48,.35)}
 .card .sketch{background:linear-gradient(180deg,#FBF9F5,#F3EEE5);padding:22px 0 8px;display:flex;justify-content:center;border-bottom:2px dashed var(--seam)}
 .card .sketch svg{height:190px;width:auto}
+.card .sketch img{height:190px;max-width:92%;object-fit:contain;border-radius:8px}
 .card .tag{
   position:absolute;top:14px;left:14px;
   font-family:'IBM Plex Mono',monospace;font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;
@@ -144,6 +145,7 @@ nav a:hover,nav a:focus-visible{border-bottom-color:var(--thread)}
 @media(max-width:680px){.m-grid{grid-template-columns:1fr}}
 .m-preview{background:#fff;border:1px dashed var(--chalk);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;align-items:center;gap:8px;height:fit-content}
 .m-preview svg{height:150px}
+.m-preview img{height:150px;max-width:100%;object-fit:contain;border-radius:8px}
 .m-preview .pname{font-family:'Italiana',serif;font-size:1.15rem;text-align:center}
 .m-preview .pprice{font-family:'IBM Plex Mono',monospace;font-size:.82rem;color:var(--gold)}
 fieldset{border:none;margin-bottom:22px}
@@ -277,14 +279,8 @@ footer a:hover{color:#fff}
       <p style="color:#6b6274;font-size:.92rem">Every design can be made in the fabric and colour of your choice — mention preferences in the notes when you order.</p>
     </div>
 
-    <div class="filters" role="group" aria-label="Filter designs by category">
-      <button class="active" data-filter="all">All</button>
-      <button data-filter="abaya">Abayas</button>
-      <button data-filter="evening">Evening</button>
-      <button data-filter="casual">Casual</button>
-      <button data-filter="bridal">Bridal</button>
-      <button data-filter="office">Office</button>
-      <button data-filter="traditional">Traditional</button>
+    <div class="filters" id="filters" role="group" aria-label="Filter designs by category">
+      <!-- buttons generated from the catalog by JS -->
     </div>
 
     <div class="gallery" id="gallery"><!-- cards injected by JS --></div>
@@ -476,37 +472,74 @@ const DESIGNS = [
    sketch:S(head+`<path d="M47 40 L73 40 L71 118 L49 118 Z" stroke="#2B2430" stroke-width="2"/><path d="M53 40 L53 60 L67 60 L67 40" stroke="#A8823C" stroke-width="1.4"/><path d="M49 96 L49 118 M71 96 L71 118" stroke="#B3402F" stroke-width="1.4" stroke-dasharray="3 3"/><path d="M52 122 L50 184 M60 122 L60 184 M68 122 L70 184" stroke="#2B2430" stroke-width="1.6"/>`)},
 ];
 
-/* ── render gallery ── */
-const gallery = document.getElementById("gallery");
-function renderGallery(filter){
+/* ── catalog (built-ins now, Google Sheet designs when loaded) ── */
+let CATALOG = DESIGNS.slice();
+let activeFilter = "all";
+const gallery   = document.getElementById("gallery");
+const filtersEl = document.getElementById("filters");
+
+/* generic dress-form placeholder for sheet designs without an image */
+const PLACEHOLDER = S(`<path d="M60 30 C76 30 84 46 83 66 C82 80 77 88 77 100 C77 116 88 126 88 144 C88 166 75 178 60 178 C45 178 32 166 32 144 C32 126 43 116 43 100 C43 88 38 80 37 66 C36 46 44 30 60 30Z" stroke="#8C86A0" stroke-width="2"/><line x1="60" y1="30" x2="60" y2="178" stroke="#D8D2C6" stroke-width="1" stroke-dasharray="3 5"/>`);
+
+const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+const media = d => d.img
+  ? `<img src="${esc(d.img)}" alt="${esc(d.name)}" loading="lazy">`
+  : (d.sketch || PLACEHOLDER);
+
+function renderFilters(){
+  const cats = [...new Set(CATALOG.map(d=>d.cat))];
+  filtersEl.innerHTML =
+    `<button data-filter="all">All</button>` +
+    cats.map(c=>`<button data-filter="${esc(c)}">${esc(c.charAt(0).toUpperCase()+c.slice(1))}</button>`).join("");
+  filtersEl.querySelectorAll("button").forEach(b=>{
+    b.classList.toggle("active", b.dataset.filter===activeFilter);
+    b.addEventListener("click", ()=>{
+      activeFilter = b.dataset.filter;
+      renderFilters();
+      renderGallery();
+    });
+  });
+}
+
+function renderGallery(){
   gallery.innerHTML = "";
-  DESIGNS.filter(d => filter==="all" || d.cat===filter).forEach(d=>{
+  CATALOG.filter(d => activeFilter==="all" || d.cat===activeFilter).forEach(d=>{
     const card = document.createElement("article");
     card.className = "card";
     card.innerHTML = `
-      <span class="tag">${d.cat}</span>
-      <div class="sketch">${d.sketch}</div>
+      <span class="tag">${esc(d.cat)}</span>
+      <div class="sketch">${media(d)}</div>
       <div class="card-body">
-        <h3>${d.name}</h3>
-        <p class="desc">${d.desc}</p>
+        <h3>${esc(d.name)}</h3>
+        <p class="desc">${esc(d.desc)}</p>
         <div class="row">
-          <span class="price">from ${d.price}</span>
-          <button class="choose" data-id="${d.id}">Choose</button>
+          <span class="price">from ${esc(d.price)}</span>
+          <button class="choose" data-id="${esc(d.id)}">Choose</button>
         </div>
       </div>`;
     gallery.appendChild(card);
   });
 }
-renderGallery("all");
+renderFilters();
+renderGallery();
 
-/* ── filters ── */
-document.querySelectorAll(".filters button").forEach(btn=>{
-  btn.addEventListener("click", ()=>{
-    document.querySelectorAll(".filters button").forEach(b=>b.classList.remove("active"));
-    btn.classList.add("active");
-    renderGallery(btn.dataset.filter);
-  });
-});
+/* ── load designs from the Google Sheet (Designs tab) ── */
+async function loadDesigns(){
+  if(!SCRIPT_URL || SCRIPT_URL.startsWith("PASTE")) return;
+  try{
+    const res  = await fetch(SCRIPT_URL + "?action=designs");
+    const list = await res.json();
+    if(Array.isArray(list) && list.length){
+      CATALOG = list;
+      if(activeFilter!=="all" && !CATALOG.some(d=>d.cat===activeFilter)) activeFilter = "all";
+      renderFilters();
+      renderGallery();
+    }
+  }catch(err){
+    console.warn("Design sheet unavailable, using built-in designs:", err);
+  }
+}
+loadDesigns();
 
 /* ── modal ── */
 const overlay   = document.getElementById("overlay");
@@ -519,9 +552,9 @@ let current = null;
 gallery.addEventListener("click", e=>{
   const btn = e.target.closest(".choose");
   if(!btn) return;
-  current = DESIGNS.find(d=>d.id===btn.dataset.id);
+  current = CATALOG.find(d=>String(d.id)===btn.dataset.id);
   document.getElementById("modalTitle").textContent = "Order · " + current.name;
-  document.getElementById("previewSketch").innerHTML = current.sketch;
+  document.getElementById("previewSketch").innerHTML = media(current);
   document.getElementById("previewName").textContent = current.name;
   document.getElementById("previewPrice").textContent = "from " + current.price;
   form.reset();
